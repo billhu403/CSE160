@@ -2,10 +2,10 @@
 // Vertex shader program
 var VSHADER_SOURCE = `
   attribute vec4 a_Position;
-  uniform float u_Size;
+  uniform mat4 u_ModelMatrix;
+  uniform mat4 u_GlobalRotateMatrix;
   void main() {
-    gl_Position = a_Position;
-    gl_PointSize = u_Size;
+    gl_Position = u_GlobalRotateMatrix * u_ModelMatrix * a_Position;
   }`
 
 // Fragment shader program
@@ -22,6 +22,8 @@ let gl;
 let a_Position;
 let u_FragColor;
 let u_Size;
+let u_ModelMatrix;
+let u_GlobalRotateMatrix;
 
 function setupWebGL(){
   // Retrieve <canvas> element
@@ -33,6 +35,7 @@ function setupWebGL(){
     console.log('Failed to get the rendering context for WebGL');
     return;
   }
+  gl.enable(gl.DEPTH_TEST)
 
 }
 
@@ -57,11 +60,20 @@ function connectVariablesToGLSL(){
     return;
   }
 
-  u_Size = gl.getUniformLocation(gl.program, 'u_Size');
-  if (!u_Size) {
-    console.log('Failed to get the storage location of u_Size');
+  u_ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
+  if(!u_ModelMatrix) {
+    console.log('Failed to get the storage location of u_ModelMatrix');
     return;
   }
+
+  u_GlobalRotateMatrix = gl.getUniformLocation(gl.program, 'u_GlobalRotateMatrix');
+  if(!u_GlobalRotateMatrix) {
+    console.log('Failed to get the storage location of u_GlobalRotateMatrix');
+    return;
+  }
+
+  var identityM = new Matrix4();
+  gl.uniformMatrix4fv(u_ModelMatrix, false, identityM.elements);
 
 }
 
@@ -72,24 +84,27 @@ const CIRCLE = 2;
 let g_selectedColor=[1.0,1.0,1.0,1.0];
 let g_selectedSize = 5;
 let g_selectedType = POINT;
-let g_circleSegments = 3;
+let g_globalAngle=0;
+let g_yellowAngle =0;
+let g_magentaAngle=0;
+let g_yellowAnimation=false;
+let g_magentaAnimation=false;
 
 function addActionsForHtmlUI(){
-  document.getElementById('green').onclick = function() { g_selectedColor = [0.0,1.0,0.0,1.0]; };
-  document.getElementById('red').onclick = function() { g_selectedColor = [1.0,0.0,0.0,1.0]; };
-  document.getElementById('clearButton').onclick = function() { g_shapeList=[]; renderAllShapes(); };
+  //BUTTONS
+  document.getElementById('animationYellowOnButton').onclick = function() { g_yellowAnimation=true;};
+  document.getElementById('animationYellowOFFButton').onclick = function() { g_yellowAnimation=false;};
 
-  document.getElementById('pointButton').onclick = function() {g_selectedType=POINT};
-  document.getElementById('triButton').onclick = function() {g_selectedType=TRIANGLE};
-  document.getElementById('circleButton').onclick = function() {g_selectedType=CIRCLE};
-  document.getElementById('drawButton').onclick = function() {draw();};
+  document.getElementById('animationMagOnButton').onclick = function() { g_magentaAnimation=true;};
+  document.getElementById('animationMagOFFButton').onclick = function() { g_magentaAnimation=false;};
 
-  document.getElementById('redSlide').addEventListener('mouseup',  function() { g_selectedColor[0] = this.value/100; });
-  document.getElementById('greenSlide').addEventListener('mouseup',  function() { g_selectedColor[1] = this.value/100; });
-  document.getElementById('blueSlide').addEventListener('mouseup',  function() { g_selectedColor[2] = this.value/100; });
+  //SLides
+  document.getElementById('angleSlide').addEventListener('mousemove',  function() { g_globalAngle = this.value; renderAllShapes(); });
+  document.getElementById('yellowSlide').addEventListener('mousemove',  function() { g_yellowAngle = this.value; renderAllShapes(); });
+  document.getElementById('magentaSlide').addEventListener('mousemove',  function() { g_magentaAngle = this.value; renderAllShapes(); });
 
-  document.getElementById('sizeSlide').addEventListener('mouseup',  function() { g_selectedSize = this.value; });
-  document.getElementById('segmentSlide').addEventListener('mouseup', function() { g_circleSegments = this.value; });
+  
+
 }
 
 function main() {
@@ -104,17 +119,26 @@ function main() {
   // Specify the color for clearing <canvas>
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
-  // Clear <canvas>
-  gl.clear(gl.COLOR_BUFFER_BIT);
+  //renderAllShapes();
+  requestAnimationFrame(tick);
+}
+
+var g_startTime = performance.now()/1000.0;
+var g_seconds = performance.now()/1000.0-g_startTime;
+
+function tick(){
+  g_seconds=performance.now()/1000.0-g_startTime;
+  console.log(g_seconds);
+
+  updateAnimationAngles();
+
+  renderAllShapes();
+  requestAnimationFrame(tick);
 }
 
 
 
 var g_shapeList = [];
-
-//var g_points = [];  // The array for the position of a mouse press
-//var g_colors = [];  // The array to store the color of a point
-//var g_sizes = [];
 
 function click(ev) {
   [x,y] = convertCoordinatesEventToGL(ev);
@@ -148,19 +172,95 @@ function convertCoordinatesEventToGL(ev){
   return([x,y]);
 }
 
+function updateAnimationAngles(){
+  if(g_yellowAnimation){
+    g_yellowAngle = (20 *Math.sin(g_seconds));
+  }
+
+  if(g_magentaAnimation){
+    g_magentaAngle = (20 *Math.sin(g_seconds));
+  }
+}
+
 function renderAllShapes(){
 
   var startTime = performance.now();
-  // Clear <canvas>
-  gl.clear(gl.COLOR_BUFFER_BIT);
 
-  var len = g_shapeList.length;
-  for(var i = 0; i < len; i++) {
-    g_shapeList[i].render();
-  }
+  var globalRotMat = new Matrix4().rotate(g_globalAngle,0,1,0);
+  gl.uniformMatrix4fv(u_GlobalRotateMatrix, false, globalRotMat.elements);
+
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  //Body
+  var body = new Cube();
+  body.color = [1.0, 0.6, 0.0, 1.0]; // orange
+  body.matrix.translate(-0.2, -0.5, 0.0);
+  body.matrix.scale(0.4, 0.6, 0.4);
+  body.render();
+
+  //Neck
+  var neck = new Cube();
+  neck.color = [1.0, 0.8, 0.6, 1.0]; // light color
+  neck.matrix.setTranslate(0.0, -.04, 0.0);
+  neck.matrix.rotate(g_yellowAngle, 0, 0, 1);  // SLIDER controlled
+  var neckCoord = new Matrix4(neck.matrix); // Sa
+  neck.matrix.scale(0.1, 0.1, 0.1);
+  neck.matrix.translate(-0.5, 1.2, -0.001);
+  neck.render();
+
+  //Head
+  var head = new Cube();
+  head.color = [1.0, 1.0, 0.8, 1.0];
+  head.matrix = neckCoord;
+  head.matrix.translate(0.0, 0.2, 0.0);
+  head.matrix.rotate(g_magentaAngle, 0, 0, 1);
+  head.matrix.scale(0.2, 0.2, 0.2);
+  head.matrix.translate(-0.5, 0.0, 0.0);
+  head.render();
+
+  //Left Wing
+  var leftWing = new Cube();
+  leftWing.color = [0.8, 0.3, 0.3, 1.0];
+  leftWing.matrix.setTranslate(-0.2, -0.2, 0.0);
+  leftWing.matrix.rotate(10 * Math.sin(g_seconds), 0, 0, 1);
+  leftWing.matrix.scale(0.2, 0.4, 0.1);
+  leftWing.matrix.translate(-1.0, 0.0, -0.001);
+  leftWing.render();
+
+  //Right Wing 
+  var rightWing = new Cube();
+  rightWing.color = [0.8, 0.3, 0.3, 1.0];
+  rightWing.matrix.setTranslate(0.2, -0.2, 0.0);
+  rightWing.matrix.rotate(-10 * Math.sin(g_seconds), 0, 0, 1);
+  rightWing.matrix.scale(0.2, 0.4, 0.1);
+  rightWing.matrix.translate(0.0, 0.0, -0.001);
+  rightWing.render();
+
+
+  //Left Leg 
+  var leftLeg = new Cube();
+  leftLeg.color = [0.5, 0.3, 0.1, 1.0];
+  leftLeg.matrix.setTranslate(-0.2, -0.9, 0.0);
+  leftLeg.matrix.scale(0.1, 0.4, 0.1);
+  leftLeg.render();
+
+  //Right Leg
+  var rightLeg = new Cube();
+  rightLeg.color = [0.5, 0.3, 0.1, 1.0];
+  rightLeg.matrix.setTranslate(0.1, -0.9, 0.0);
+  rightLeg.matrix.scale(0.1, 0.4, 0.1);
+  rightLeg.render();
+
+  var beak = new Cube();
+  beak.color = [1.0, 0.7, 0.0, 1.0]; 
+  beak.matrix = new Matrix4(head.matrix); 
+  beak.matrix.translate(0.52, 0.3, -0.2);
+  beak.matrix.scale(0.1, 0.1, 0.3); 
+  beak.matrix.translate(-0.5, 0.0, 0.0);
+  beak.render();
   
   var duration = performance.now() - startTime;
-  sendTextToHTML("numdot: " + len + " ms: " + Math.floor(duration) + " fps: " + Math.floor(10000/duration)/10, "numdot");
+  sendTextToHTML(" ms: " + Math.floor(duration) + " fps: " + Math.floor(10000/duration)/10, "numdot");
 }
 
 function sendTextToHTML(text, htmlID){
@@ -172,34 +272,3 @@ function sendTextToHTML(text, htmlID){
   htmlElm.innerHTML = text;
 }
 
-function draw() {
-
-  gl.clear(gl.COLOR_BUFFER_BIT);
-
-
-  gl.uniform4f(u_FragColor, 1.0, 1.0, 0.0, 1.0);
-  let cx = 0.7, cy = 0.7, r = 0.15;
-  for (let i = 0; i < 360; i += 30) {
-    let rad1 = i * Math.PI / 180;
-    let rad2 = (i + 30) * Math.PI / 180;
-    let x1 = cx + r * Math.cos(rad1);
-    let y1 = cy + r * Math.sin(rad1);
-    let x2 = cx + r * Math.cos(rad2);
-    let y2 = cy + r * Math.sin(rad2);
-    drawTriangle([cx, cy, x1, y1, x2, y2]);
-  }
-
-  gl.uniform4f(u_FragColor, 0.55, 0.27, 0.07, 1.0); 
-  drawTriangle([-0.1, -0.8, -0.05, -0.4, 0.0, -0.8]);
-  drawTriangle([-0.05, -0.4, 0.05, -0.4, 0.0, -0.8]);
-
-  gl.uniform4f(u_FragColor, 0.0, 0.6, 0.0, 1.0);
-  drawTriangle([-0.15, -0.4, 0.0, -0.2, 0.15, -0.4]);
-  drawTriangle([-0.13, -0.3, 0.0, -0.1, 0.13, -0.3]);
-  drawTriangle([-0.11, -0.2, 0.0, 0.0, 0.11, -0.2]);
-
-  gl.uniform4f(u_FragColor, 0.0, 0.8, 0.0, 1.0); 
-  drawTriangle([-0.8, -0.9, -0.75, -0.75, -0.7, -0.9]);
-  drawTriangle([-0.05, -0.9, 0.0, -0.75, 0.05, -0.9]);
-  drawTriangle([0.6, -0.9, 0.65, -0.75, 0.7, -0.9]);
-}
