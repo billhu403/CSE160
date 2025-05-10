@@ -20,6 +20,10 @@ var FSHADER_SOURCE = `
   varying vec2 v_UV;
   uniform vec4 u_FragColor;
   uniform sampler2D u_Sampler0;
+  uniform sampler2D u_Sampler1;
+  uniform sampler2D u_Sampler2;
+  uniform sampler2D u_Sampler3;
+  uniform sampler2D u_Sampler4;
   uniform int u_whichTexture;
   void main(){
     if (u_whichTexture == -2){
@@ -28,6 +32,14 @@ var FSHADER_SOURCE = `
       gl_FragColor = vec4(v_UV, 1.0, 1.0);
     } else if(u_whichTexture == 0){
       gl_FragColor = texture2D(u_Sampler0, v_UV);
+    } else if(u_whichTexture == 1){
+      gl_FragColor = texture2D(u_Sampler1, v_UV);
+    } else if(u_whichTexture == 2){
+      gl_FragColor = texture2D(u_Sampler2, v_UV);
+    } else if(u_whichTexture == 3){
+      gl_FragColor = texture2D(u_Sampler3, v_UV);
+    } else if(u_whichTexture == 4){
+      gl_FragColor = texture2D(u_Sampler4, v_UV);
     } else{
       gl_FragColor = vec4(1,.2,.2,1);
     }
@@ -45,6 +57,10 @@ let u_ViewMatrix;
 let u_ProjectMatrix;
 let u_GlobalRotateMatrix;
 let u_Sampler0;
+let u_Sampler1;
+let u_Sampler2;
+let u_Sampler3;
+let u_Sampler4;
 let u_whichTexture;
 
 function setupWebGL(){
@@ -119,6 +135,30 @@ function connectVariablesToGLSL(){
     return false;
   } 
 
+  u_Sampler1 = gl.getUniformLocation(gl.program, 'u_Sampler1');
+  if (!u_Sampler1) {
+    console.log('Failed to get the storage location of u_Sampler1');
+    return false;
+  }
+
+  u_Sampler2 = gl.getUniformLocation(gl.program, 'u_Sampler2');
+  if (!u_Sampler2) {
+    console.log('Failed to get the storage location of u_Sampler2');
+    return false;
+  }
+
+  u_Sampler3 = gl.getUniformLocation(gl.program, 'u_Sampler3');
+  if (!u_Sampler3) {
+    console.log('Failed to get the storage location of u_Sampler3');
+    return false;
+  }
+
+  u_Sampler4 = gl.getUniformLocation(gl.program, 'u_Sampler4');
+  if (!u_Sampler4) {
+    console.log('Failed to get the storage location of u_Sampler4');
+    return false;
+  }
+
   u_whichTexture = gl.getUniformLocation(gl.program, 'u_whichTexture');
   if (!u_whichTexture) {
     console.log('Failed to get the storage location of u_whichTexture');
@@ -142,6 +182,12 @@ let g_yellowAngle =0;
 let g_magentaAngle=0;
 let g_yellowAnimation=false;
 let g_magentaAnimation=false;
+let g_cameraAngle = 0;
+let g_textureUnit = 0;
+let g_mouseDown = false;
+let g_lastX = null;
+
+
 
 function addActionsForHtmlUI(){
   //BUTTONS
@@ -158,33 +204,69 @@ function addActionsForHtmlUI(){
 
 }
 
-function initTextures(gl, n){
-    var image = new Image();
-    if(!image){
-        console.log('Failed to create the image object');
-        return false;
-    }
-    image.onload = function(){ sendTextureToGLSL(image)};
-    image.src = 'sky.jpg';
-    return true;
+function initTextures() {
+  const textureList = [
+    { src: 'sky.jpg', unit: 0, sampler: u_Sampler0 },
+    { src: 'grass.jpg', unit: 1, sampler: u_Sampler1 },
+    { src: 'wall.jpg', unit: 2, sampler: u_Sampler2 },
+    { src: 'wings.jpg', unit: 3, sampler: u_Sampler3 },
+    { src: 'body.jpg', unit: 4, sampler: u_Sampler4 },
+  ];
+
+  textureList.forEach(({ src, unit, sampler }) => {
+    const image = new Image();
+    image.onload = () => {
+      const texture = gl.createTexture();
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      gl.uniform1i(sampler, unit);
+      console.log(`Bound ${src} to texture unit ${unit}`);
+    };
+    image.src = src;
+  });
 }
 
-function sendTextureToGLSL(image){
-    var texture = gl.createTexture();
-    if(!texture){
-        console.log('Failed to create the texture object');
-        return false;
-    }
 
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+
+function sendTextureToGLSL(image){
+  var texture = gl.createTexture();
+  if(!texture){
+    console.log('Failed to create the texture object');
+    return false;
+  }
+
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+  if (g_textureUnit === 0) {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
-
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
     gl.uniform1i(u_Sampler0, 0);
+  } else if (g_textureUnit === 1) {
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform1i(u_Sampler1, 1);
+  } else if (g_textureUnit === 2) {
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform1i(u_Sampler2, 2);
+  } else if (g_textureUnit === 3) {
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform1i(u_Sampler3, 3);
+  } else if (g_textureUnit === 4) {
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform1i(u_Sampler4, 4);
+  }
 
-    console.log('finished loadTexture');
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+
+  console.log('finished loading texture');
+  g_textureUnit++;
+   
 }
 
 function main() {
@@ -195,6 +277,21 @@ function main() {
   // Register function (event handler) to be called on a mouse press
   //canvas.onmousedown = click;
   //canvas.onmousemove = function(ev) { if(ev.buttons == 1) { click(ev)} };
+
+  
+  canvas.onmousedown = (ev) => {
+  g_mouseDown = true;
+  g_lastX = ev.clientX;
+  };
+
+  document.onmouseup = () => {
+  g_mouseDown = false;
+  g_lastX = null;
+  };
+
+  document.onmousemove = (ev) => {
+  if (g_mouseDown) onMouseMove(ev);
+  };
 
   document.onkeydown = keydown;
   initTextures();
@@ -207,6 +304,19 @@ function main() {
 
 var g_startTime = performance.now()/1000.0;
 var g_seconds = performance.now()/1000.0-g_startTime;
+
+function onMouseMove(ev) {
+  if (g_lastX === null) {
+    g_lastX = ev.clientX;
+    return;
+  }
+
+  const deltaX = ev.clientX - g_lastX;
+  g_lastX = ev.clientX;
+
+  const ROTATE_SENSITIVITY = 0.3; 
+  g_camera.turn(deltaX * ROTATE_SENSITIVITY);
+}
 
 function tick(){
   g_seconds=performance.now()/1000.0-g_startTime;
@@ -264,62 +374,93 @@ function updateAnimationAngles(){
   }
 }
 
-function keydown(ev){
-    let d = 0.2; // movement step
-    let angleStep = 5; // rotation step in degrees
-  
-    let forward = new Vector3([
-      g_at.elements[0] - g_eye.elements[0],
-      g_at.elements[1] - g_eye.elements[1],
-      g_at.elements[2] - g_eye.elements[2]
-    ]);
-    forward.normalize();
-  
-    let right = Vector3.cross(forward, g_up);
-    right.normalize();
-  
-    switch (ev.key.toLowerCase()) {
-      case 'w': // forward
-        g_eye = g_eye.add(forward.mul(d));
-        g_at = g_at.add(forward.mul(d));
-        break;
-      case 's': // backward
-        g_eye = g_eye.sub(forward.mul(d));
-        g_at = g_at.sub(forward.mul(d));
-        break;
-      case 'a': // left
-        g_eye = g_eye.sub(right.mul(d));
-        g_at = g_at.sub(right.mul(d));
-        break;
-      case 'd': // right
-        g_eye = g_eye.add(right.mul(d));
-        g_at = g_at.add(right.mul(d));
-        break;
-      case 'q': // turn left
-        g_cameraAngle -= angleStep;
-        updateCameraDirection();
-        break;
-      case 'e': // turn right
-        g_cameraAngle += angleStep;
-        updateCameraDirection();
-        break;
+function keydown(ev) {
+  console.log("Key pressed:", ev.key); 
+  switch (ev.key.toLowerCase()) {
+    case 'w': g_camera.forward(); break;
+    case 's': g_camera.back(); break;
+    case 'a': g_camera.left(); break;
+    case 'd': g_camera.right(); break;
+    case 'q': g_camera.turnLeft(); break;
+    case 'e': g_camera.turnRight(); break;
+    case 'f': 
+      console.log("Pressed F");
+      addBlockInFront(); 
+      break;
+    case 'g': 
+      console.log("Pressed G");
+      removeBlockInFront(); 
+      break;
+  }
+  renderAllShapes();
+}
+
+function getMapCoordsInFront() {
+  let dir = new Vector3(g_camera.at.elements).sub(g_camera.eye).normalize();
+  let target = new Vector3([
+  g_camera.eye.elements[0] + dir.elements[0] * 0.3,
+  g_camera.eye.elements[1] + dir.elements[1] * 0.3,
+  g_camera.eye.elements[2] + dir.elements[2] * 0.3
+]);
+  let x = Math.floor((target.elements[0] + 4.8) / 0.3);
+  let z = Math.floor((target.elements[2] + 4.8) / 0.3);
+  x = Math.max(0, Math.min(31, x));
+  z = Math.max(0, Math.min(31, z));
+  return [z, x]; 
+}
+
+function addBlockInFront() {
+  const [z, x] = getMapCoordsInFront();
+  console.log("Add at", z, x);
+  if (worldMap[z][x] < 6) worldMap[z][x]++;
+}
+
+function removeBlockInFront() {
+  const [x, z] = getMapCoordsInFront();
+
+  if (worldMap[z] && worldMap[z][x] > 0) {
+    console.log(`Removing block at ${z}, ${x}`);
+    worldMap[z][x]--;
+  } else {
+    console.log(`No block to remove at ${z}, ${x}`);
+  }
+}
+
+
+var g_camera = new Camera();
+
+let worldMap = new Array(32).fill(0).map(() => new Array(32).fill(0));
+for (let i = 0; i < 32; i++) {
+  worldMap[i][0] = 3;
+  worldMap[i][31] = 2;
+  worldMap[0][i] = 1;
+  worldMap[31][i] = 4;
+}
+
+for (let z = 6; z < 26; z += 6) {
+  for (let x = 6; x < 26; x += 6) {
+    worldMap[z][x] = Math.floor(Math.random() * 2) + 1;
+  }
+}
+
+function drawMap() {
+  let cube = new Cube();
+  for (let z = 0; z < worldMap.length; z++) {
+    for (let x = 0; x < worldMap[z].length; x++) {
+      let height = worldMap[z][x];
+      for (let y = 0; y < height; y++) {
+        cube.matrix.setIdentity(); 
+        cube.color = [0.7, 0.7, 0.7, 1];
+        cube.textureNum = 2;
+        cube.matrix.translate(x * 0.3 - 4.8, y * 0.3 - 0.75, z * 0.3 - 4.8);
+        cube.matrix.scale(0.3, 0.3, 0.3);
+        cube.renderfaster();
+      }
     }
-  
-    renderAllShapes();
+  }
 }
 
-function updateCameraDirection() {
-    let rad = g_cameraAngle * Math.PI / 180;
-    let x = Math.sin(rad);
-    let z = -Math.cos(rad);
-    g_at.elements[0] = g_eye.elements[0] + x;
-    g_at.elements[1] = g_eye.elements[1]; 
-    g_at.elements[2] = g_eye.elements[2] + z;
-}
 
-let g_eye = new Vector3([0, 0, 3]);
-let g_at  = new Vector3([0, 0, -100]);
-let g_up  = new Vector3([0, 1, 0]);
 
 function renderAllShapes(){
 
@@ -332,9 +473,9 @@ function renderAllShapes(){
 
   var viewMat = new Matrix4();
   viewMat.setLookAt(
-    g_eye.elements[0], g_eye.elements[1], g_eye.elements[2],
-    g_at.elements[0],  g_at.elements[1],  g_at.elements[2],
-    g_up.elements[0],  g_up.elements[1],  g_up.elements[2]
+    g_camera.eye.elements[0], g_camera.eye.elements[1], g_camera.eye.elements[2],
+    g_camera.at.elements[0],  g_camera.at.elements[1],  g_camera.at.elements[2],
+    g_camera.up.elements[0],  g_camera.up.elements[1],  g_camera.up.elements[2]
   );
 
   gl.uniformMatrix4fv(u_ViewMatrix, false, viewMat.elements);
@@ -345,10 +486,29 @@ function renderAllShapes(){
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
+
+  drawMap();
+
+  var floor = new Cube();
+  floor.color = [1.0, 0.0, 0.0, 1.0];
+  floor.textureNum = 1;
+  floor.matrix.translate(0, -0.75, 0.0);
+  floor.matrix.scale(10,0,10);
+  floor.matrix.translate(-0.5, -0, -0.5);
+  floor.render();
+
+  var sky = new Cube();
+  sky.color = [1.0, 0.0, 0.0, 1.0];
+  sky.textureNum = 0;
+  sky.matrix.translate(0, -0.75, 0.0);
+  sky.matrix.scale(50,50,50);
+  sky.matrix.translate(-0.5, -.5, -0.5);
+  sky.render();
+  
   //Body
   var body = new Cube();
   body.color = [1.0, 0.6, 0.0, 1.0];
-  body.textureNum = 0;
+  body.textureNum = 4;
   body.matrix.translate(-0.2, -0.5, 0.0);
   body.matrix.scale(0.4, 0.6, 0.4);
   body.render();
@@ -356,17 +516,18 @@ function renderAllShapes(){
   //Neck
   var neck = new Cube();
   neck.color = [1.0, 0.8, 0.6, 1.0]; 
+  neck.textureNum = -2;
   neck.matrix.setTranslate(0.0, -.04, 0.0);
   neck.matrix.rotate(g_yellowAngle, 0, 0, 1);
   var neckCoord = new Matrix4(neck.matrix); 
-  neck.matrix.scale(0.1, 0.1, 0.1);
+  neck.matrix.scale(0.09, 0.09, 0.08);
   neck.matrix.translate(-0.5, 1.2, -0.001);
   neck.render();
 
   //Head
   var head = new Cube();
   head.color = [1.0, 1.0, 0.8, 1.0];
-  head.textureNum = 0;
+  head.textureNum = 4;
   head.matrix = neckCoord;
   head.matrix.translate(0.0, 0.2, 0.0);
   head.matrix.rotate(g_magentaAngle, 0, 0, 1);
@@ -377,6 +538,7 @@ function renderAllShapes(){
   //Left Wing
   var leftWing = new Cube();
   leftWing.color = [0.8, 0.3, 0.3, 1.0];
+  leftWing.textureNum = 3;
   leftWing.matrix.setTranslate(-0.2, -0.2, 0.0);
   leftWing.matrix.rotate(10 * Math.sin(g_seconds), 0, 0, 1);
   leftWing.matrix.scale(0.2, 0.4, 0.1);
@@ -386,6 +548,7 @@ function renderAllShapes(){
   //Right Wing 
   var rightWing = new Cube();
   rightWing.color = [0.8, 0.3, 0.3, 1.0];
+  rightWing.textureNum = 3;
   rightWing.matrix.setTranslate(0.2, -0.2, 0.0);
   rightWing.matrix.rotate(-10 * Math.sin(g_seconds), 0, 0, 1);
   rightWing.matrix.scale(0.2, 0.4, 0.1);
@@ -396,6 +559,7 @@ function renderAllShapes(){
   //Left Leg 
   var leftLeg = new Cube();
   leftLeg.color = [0.5, 0.3, 0.1, 1.0];
+  leftLeg.textureNum = -2;
   leftLeg.matrix.setTranslate(-0.2, -0.9, 0.0);
   leftLeg.matrix.scale(0.1, 0.4, 0.1);
   leftLeg.render();
@@ -403,17 +567,21 @@ function renderAllShapes(){
   //Right Leg
   var rightLeg = new Cube();
   rightLeg.color = [0.5, 0.3, 0.1, 1.0];
+  rightLeg.textureNum = -2;
   rightLeg.matrix.setTranslate(0.1, -0.9, 0.0);
   rightLeg.matrix.scale(0.1, 0.4, 0.1);
   rightLeg.render();
 
   var beak = new Cube();
   beak.color = [1.0, 0.7, 0.0, 1.0]; 
+  beak.textureNum = -2;
   beak.matrix = new Matrix4(head.matrix); 
   beak.matrix.translate(0.52, 0.3, -0.2);
   beak.matrix.scale(0.1, 0.1, 0.3); 
   beak.matrix.translate(-0.5, 0.0, 0.0);
   beak.render();
+  
+  
   
   var duration = performance.now() - startTime;
   sendTextToHTML(" ms: " + Math.floor(duration) + " fps: " + Math.floor(10000/duration)/10, "numdot");
