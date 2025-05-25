@@ -140,6 +140,7 @@ function drawTriangle3DUV(vertices, uv) {
   gl.enableVertexAttribArray(a_UV);
 
   gl.drawArrays(gl.TRIANGLES, 0, n);
+  
 
   g_vertexBuffer = null;
 }
