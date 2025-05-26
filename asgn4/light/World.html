@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Blocky Animal</title>
+  </head>
+
+  <body onload="main()">
+    <canvas id="webgl" width="400" height="400">
+    Please use a browser that supports "canvas"
+    </canvas>
+    <p>
+
+    <p id = "numdot" > XXX </p>
+    
+    <head>Story: Lost bird on island wanting to find its friends</head>
+
+    <p>
+    <button type="button" id="normalOn">Normal On</button>
+    <button type="button" id="normalOff">Normal Off</button>
+
+    
+    <p>
+    Light:
+    <button type="button" id="lightOnButton">ON</button>
+    <button type="button" id="lightOffButton">OFF</button>
+
+
+    <p>
+    Light X <input type = "range", min = "-250", max = "250", value = "0" class="slider" id = "lightSlideX">
+    Light Y <input type = "range", min = "-250", max = "250", value = "100" class="slider" id = "lightSlideY">
+    Light Z <input type = "range", min = "-250", max = "250", value = "200" class="slider" id = "lightSlideZ">
+
+    <p>
+    Head <input type = "range", min = "-45", max = "45", value = "0" class="slider" id = "magentaSlide">
+    Animation:
+    <button type="button" id="animationMagOnButton">ON</button>
+    <button type="button" id="animationMagOFFButton">OFF</button>
+
+    <p>
+    Neck <input type = "range", min = "-45", max = "45", value = "0" class="slider" id = "yellowSlide">
+    Animation:
+    <button type="button" id="animationYellowOnButton">ON</button>
+    <button type="button" id="animationYellowOFFButton">OFF</button>
+
+    <p>
+    Camera Angle <input type = "range", min = "0", max = "90", value = "0" class="slider" id = "angleSlide">
+    
+    
+
+ 
+    <script src="../lib/webgl-utils.js"></script>
+    <script src="../lib/webgl-debug.js"></script>
+    <script src="../lib/cuon-utils.js"></script>
+    <script src="../lib/cuon-matrix-cse160.js"></script>
+    <script src="Triangle.js"></script>
+    <script src="Circle.js"></script>
+    <script src="Point.js"></script>
+    <script src="Cube.js"></script>
+    <script src="Sphere.js"></script>
+    <script src="Camera.js"></script>
+    <script src="World.js"></script>
+  </body>
+</html>
